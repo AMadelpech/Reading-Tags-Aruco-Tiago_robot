@@ -2,8 +2,8 @@
 
 **Semestre 2: Cours de Robotique de service**
 
-<img src="/home/rosdev/ros2_ws/src/tiago_pick_and_place/image/image.png"> 
-
+![Capture de la scène sur Gazebo](image.png)
+*Image : Capture de la scène sur Gazebo*
 
 👨‍💻 **Etudiants:** Célia Gonzalez & Aimy Madelpech
 
