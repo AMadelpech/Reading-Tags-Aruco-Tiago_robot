@@ -2,7 +2,7 @@
 
 **Semestre 2: Cours de Robotique de service**
 
-<img src="https://placehold.co/900x300?text=Picture%20illustrating%20the%20project"> 
+<img src="/home/rosdev/ros2_ws/src/tiago_pick_and_place/image/image.png"> 
 
 <img src="images/image.png" alt="capture de la scene" width="300"/>
 
