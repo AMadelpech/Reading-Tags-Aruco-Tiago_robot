@@ -4,9 +4,6 @@
 
 <img src="/home/rosdev/ros2_ws/src/tiago_pick_and_place/image/image.png"> 
 
-<img src="images/image.png" alt="capture de la scene" width="300"/>
-
-![Texte alternatif](images/image.png)
 
 👨‍💻 **Etudiants:** Célia Gonzalez & Aimy Madelpech
 
@@ -61,7 +58,7 @@ ros2 run tiago_pick_and_place tiago_pick
 ```
 
 
-## 📚 References and bibliography
+## 📚 Références and bibliographie
 • Documentation ROS 2
 
 • Tutoriels Tiago Robot
