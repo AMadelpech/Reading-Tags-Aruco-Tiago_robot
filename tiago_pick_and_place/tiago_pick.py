@@ -5,6 +5,9 @@ from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
 import cv2
 import numpy as np
+from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
+from builtin_interfaces.msg import Duration
+import time
 
 class TiagoPickPlace(Node): #ArucoDetector
     def __init__(self):
@@ -27,10 +30,18 @@ class TiagoPickPlace(Node): #ArucoDetector
         #print de démarrage du sbscriber caméra:
         self.get_logger().info("Tiago Subscriber camera node started")
 
+        self.searching = True  
+        self.target_distance = 1.0  
+        self.last_detected_id = None  
+
         # Variables pour déplacement jusqu'à détection de code Aruco 
         self.is_rotating = False
         self.rotation_angle = 0.0
         self.rotation_increment = 0.1  # radians
+
+        # Publisher pour envoyer des commandes au bras
+        self.arm_publisher = self.create_publisher(JointTrajectory, '/arm_controller/joint_trajectory', 10)
+        
     
     def image_callback(self, msg):
         print("titi")
@@ -60,14 +71,29 @@ class TiagoPickPlace(Node): #ArucoDetector
             cx, cy = np.mean(corners[0][0], axis=0)
 
             #distance approchée : 
-            approx_distance = 1000 / (cy + 1)
+            distance = 500 / (cy + 1)
 
-            self.move_to_aruco(cx, frame.shape[1], approx_distance)
-            self.is_rotating = False  # Arrêter la rotation si un code est détecté
+            if distance > self.target_distance + 0.2:  
+                self.move_to_aruco(cx, frame.shape[1], distance)
+            else:
+                if self.detection_time is None:
+                    self.detection_time = time.time()
+
+                elapsed_time = time.time() - self.detection_time
+                if elapsed_time >= 2:  
+                    self.get_logger().info("Attente terminée, reprise de la recherche.")
+                    self.detection_time = None  
+                    self.last_detected_id = ids.flatten()[-1]  
+                    self.wave_arm()  
+                    self.move_forward_slightly()
+                    self.searching = True  
+
         else:
-            self.get_logger().info("Aucun code Aruco détecté, rotation du robot.")
-            self.rotate_robot()
-            
+            self.detection_time = None  
+            self.get_logger().info("Aucun ArUco détecté, rotation du robot.")
+            if self.searching:
+                self.rotate_robot()
+       
         
         # Affichage de l’image en temps réel
         cv2.imshow("Tiago Camera - Aruco Detection", frame)
@@ -117,10 +143,12 @@ class TiagoPickPlace(Node): #ArucoDetector
 
         twist.angular.z = -Kp_angular * error_x
 
-        if distance > 0.5:  # Se déplace seulement si loin
-            twist.linear.x = min(Kp_linear * distance, 0.3)  # Vitesse max 0.3 m/s
+        if distance > self.target_distance + 0.2:  # Ajout d'une marge de tolérance
+            twist.linear.x = min(Kp_linear * (distance - self.target_distance), 0.3)  # Vitesse max 0.3 m/s
         else:
             twist.linear.x = 0.0  # Stop quand proche
+            self.get_logger().info("Arrivé à 1m du marqueur, recherche d'un autre Aruco.")
+            self.searching = True  # Redémarrer la recherche
 
         
         self.publisher.publish(twist)
@@ -129,10 +157,36 @@ class TiagoPickPlace(Node): #ArucoDetector
         # Vérifier si on est suffisamment proche et arrêter
        
 
-    # def stop_robot(self):
-    #     stop_msg = Twist()
-    #     self.publisher.publish(stop_msg)
-    #     self.get_logger().info("Robot arrêté.")
+    def stop_robot(self):
+        stop_msg = Twist()
+        self.publisher.publish(stop_msg)
+        self.get_logger().info("Robot arrêté.")
+
+    def wave_arm(self):
+        self.get_logger().info(f"Exécution du mouvement de bras pour ArUco {self.last_detected_id}")
+        # Création d'un message JointTrajectory pour le mouvement de "wave"
+        trajectory_msg = JointTrajectory()
+        trajectory_msg.joint_names = ['arm_1_joint', 'arm_2_joint', 'arm_3_joint']  # noms des articulations
+
+        # Ajout de points de trajectoire pour le mouvement de "wave"
+        point1 = JointTrajectoryPoint()
+        point1.positions = [0.0, 0.0, 0.0]  # Position initiale
+        point1.time_from_start = Duration(sec=0, nanosec=0)
+        trajectory_msg.points.append(point1)
+
+        point2 = JointTrajectoryPoint()
+        point2.positions = [0.5, 0.5, 0.0]  # Position intermédiaire
+        point2.time_from_start = Duration(sec=1, nanosec=0)
+        trajectory_msg.points.append(point2)
+
+        point3 = JointTrajectoryPoint()
+        point3.positions = [0.0, 0.0, 0.0]  # Retour à la position initiale
+        point3.time_from_start = Duration(sec=2, nanosec=0)
+        trajectory_msg.points.append(point3)
+
+        # Publication du message
+        self.arm_publisher.publish(trajectory_msg)
+        self.get_logger().info("Fait un mouvement de wave avec le bras")
 
 def main(args=None):
     rclpy.init(args=args)
